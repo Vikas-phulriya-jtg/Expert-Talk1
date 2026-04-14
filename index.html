@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FP Masterclass: Senior Architect Mode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Warm Neutrals (Stone/Alabaster background, Terracotta/Orange accents, Charcoal text) -->
+    <!-- Application Structure Plan: The SPA uses a "Course Dashboard" layout. The sidebar serves as a syllabus timeline, allowing users to navigate between the 6 core pillars non-linearly. The main content area dynamically updates to present the selected pillar's theory, relatable analogy, interactive "Junior vs. Senior" code comparison, and interview scripting. -->
+    <!-- Visualization & Content Choices: Cognitive Load Comparison -> Compare -> Bar Chart (Chart.js) -> Updates on pillar change -> Visually reinforces why FP is cleaner than imperative code -> Chart.js. Both visualizations avoid SVG and Mermaid as requested. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            background-color: #fafaf9;
+            color: #1c1917;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 250px;
+            max-height: 300px;
+        }
+
+        .code-block {
+            font-family: monospace;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .active-nav {
+            background-color: #ffedd5;
+            border-left: 4px solid #ea580c;
+            color: #9a3412;
+            font-weight: 600;
+        }
+
+        .inactive-nav {
+            border-left: 4px solid transparent;
+            color: #57534e;
+        }
+
+        .inactive-nav:hover {
+            background-color: #f5f5f4;
+        }
+
+        .glass-panel {
+            background: white;
+            border: 1px solid #e7e5e4;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+
+        .hide {
+            display: none;
+        }
+
+        /* Q&A Overlay Styles */
+        #qna-overlay {
+            display: none;
+            background-color: #0c0a09;
+            /* Stone 950 */
+            z-index: 100;
+        }
+
+        .qna-text {
+            font-size: 25vw;
+            line-height: 1;
+            letter-spacing: -0.05em;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+
+    <!-- Q&A Full Screen Overlay -->
+    <div id="qna-overlay" class="fixed inset-0 flex flex-col items-center justify-center p-8">
+        <button onclick="hideQnAScreen()"
+            class="absolute top-8 right-8 text-stone-500 hover:text-stone-300 font-mono text-sm tracking-widest uppercase flex items-center gap-2">
+            <span>✕</span> Close
+        </button>
+        <div class="flex flex-col items-center justify-center animate-pulse">
+            <h1 class="qna-text font-black text-orange-600 text-center tracking-tighter">
+                Q&A
+            </h1>
+            <div class="h-2 w-32 bg-stone-800 rounded-full mt-4"></div>
+        </div>
+        <footer class="absolute bottom-12 left-0 w-full text-center">
+            <p class="text-stone-500 font-mono text-sm tracking-widest uppercase">
+                The floor is now open for your questions
+            </p>
+        </footer>
+    </div>
+
+    <nav
+        class="w-full md:w-1/4 lg:w-1/5 bg-white border-r border-stone-200 flex flex-col h-auto md:h-screen sticky top-0 overflow-y-auto z-10">
+        <div class="flex-1 py-4 flex flex-col" id="nav-container-wrapper">
+            <div id="nav-container" class="flex-1"></div>
+
+            <!-- Presenter Tools -->
+            <div class="p-6 border-t border-stone-200 mt-auto">
+                <h3 class="text-xs font-bold text-stone-400 uppercase tracking-wider mb-4">Presenter Tools</h3>
+                <button onclick="showQnAScreen()"
+                    class="w-full bg-stone-900 hover:bg-black text-white px-4 py-3 rounded-xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-2">
+                    🚀 Show Q&A Screen
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="w-full md:w-3/4 lg:w-4/5 p-4 md:p-8 overflow-y-auto relative">
+        <div class="max-w-5xl mx-auto">
+
+            <header class="mb-8">
+                <h2 class="text-3xl md:text-4xl font-extrabold text-stone-800" id="content-title">Loading...</h2>
+                <div class="flex items-center gap-3 mt-3 text-stone-500 font-medium">
+                    <span id="content-focus"></span>
+                </div>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="lg:col-span-2 space-y-6">
+                    <section class="glass-panel rounded-xl p-6">
+                        <h3 class="text-xl font-bold text-stone-800 mb-3 flex items-center gap-2"><span>📘</span> The
+                            Concept</h3>
+                        <p class="text-stone-600 leading-relaxed" id="content-desc"></p>
+                    </section>
+
+                    <section class="glass-panel rounded-xl p-6 bg-orange-50/50 border-orange-100">
+                        <h3 class="text-xl font-bold text-orange-800 mb-3 flex items-center gap-2"><span>🧠</span>
+                            Student Analogy</h3>
+                        <p class="text-stone-700 italic font-medium mb-2" id="analogy-title"></p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-sm">
+                            <div class="bg-white p-4 rounded-lg border border-red-100 shadow-sm">
+                                <p class="font-bold text-red-600 mb-1">❌ The Junior Trap</p>
+                                <p class="text-stone-600" id="analogy-bad"></p>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg border border-green-100 shadow-sm">
+                                <p class="font-bold text-green-600 mb-1">✅ The Senior Fix</p>
+                                <p class="text-stone-600" id="analogy-good"></p>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="space-y-6">
+                    <section class="glass-panel rounded-xl p-6">
+                        <h3 class="text-lg font-bold text-stone-800 mb-4 text-center">Cognitive Load Comparison</h3>
+                        <div class="chart-container h-48">
+                            <canvas id="metricsChart"></canvas>
+                        </div>
+                        <p class="text-xs text-stone-500 text-center mt-2">Lower is better. Measures mental effort
+                            required to read the logic.</p>
+                    </section>
+
+                    <section class="glass-panel rounded-xl p-6 bg-stone-800 text-stone-100 border-stone-900">
+                        <h3 class="text-lg font-bold text-orange-400 mb-3 flex items-center gap-2"><span>🗣️</span>
+                            Interview Script</h3>
+                        <p class="text-sm leading-relaxed italic" id="interview-script"></p>
+                    </section>
+                </div>
+            </div>
+
+            <section class="glass-panel rounded-xl overflow-hidden flex flex-col mb-12">
+                <div class="bg-stone-100 border-b border-stone-200 px-4 py-3 flex justify-between items-center">
+                    <h3 class="font-bold text-stone-800 flex items-center gap-2"><span>💻</span> The Shift in Thinking
+                        (Code)</h3>
+                    <div class="flex bg-stone-200 rounded-lg p-1">
+                        <button id="btn-junior"
+                            class="px-4 py-1.5 rounded-md text-sm font-medium bg-white shadow-sm text-red-600 transition-all">❌
+                            Junior Trap</button>
+                        <button id="btn-senior"
+                            class="px-4 py-1.5 rounded-md text-sm font-medium text-stone-500 hover:text-stone-700 transition-all">✅
+                            Senior Fix</button>
+                    </div>
+                </div>
+                <div class="p-6 bg-[#1e1e1e] text-[#d4d4d4] font-mono text-sm overflow-x-auto relative">
+                    <div id="code-junior-view" class="code-block text-red-300"></div>
+                    <div id="code-senior-view" class="code-block text-green-300 hide"></div>
+                </div>
+                <div class="bg-stone-50 p-4 border-t border-stone-200">
+                    <h4 class="font-bold text-stone-700 text-sm mb-2">Why this matters:</h4>
+                    <ul class="text-sm text-stone-600 space-y-1 list-disc list-inside" id="shift-reasons"></ul>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <script>
+        const masterclassData = {
+            pillars: [
+                {
+                    id: 1,
+                    title: "Pillar 1: The Purity Protocol",
+                    focus: "Eliminating side effects & unpredictable state.",
+                    desc: "Academic code relies heavily on global variables to store state. Professional code isolates state. A 'Pure Function' guarantees that given the same input, you get the exact same output, with zero side effects (no mutating external variables, no unprompted API calls).",
+                    analogyTitle: "The College Library vs. The Local Xerox Shop",
+                    analogyBad: "You borrow a college library book and highlight your notes directly on the pages. You've ruined the book for the next batch of students (a side effect).",
+                    analogyGood: "You go to the local Xerox shop, photocopy the chapter, highlight your copy, and return the original book untouched. Safe, predictable, and repeatable.",
+                    codeJunior: "let cgpa = 8.2;\nconst addGraceMarks = (points) => { cgpa += points; }; \n\naddGraceMarks(0.5); // Mutates global state!",
+                    codeSenior: "const calculateNewCgpa = (currentCgpa, points) => currentCgpa + points;\n\nconst newCgpa = calculateNewCgpa(8.2, 0.5); // Safe & Pure",
+                    shiftReasons: [
+                        "Relies on explicit arguments instead of external scope.",
+                        "Returns a brand-new copy instead of modifying data directly.",
+                        "Trivial to test in complete isolation without mocking environments."
+                    ],
+                    script: "I'm writing this as a pure function to keep it deterministic and testable in isolation. By avoiding side effects, we prevent race conditions in larger applications.",
+                    metrics: [85, 20]
+                },
+                {
+                    id: 2,
+                    title: "Pillar 2: Declarative vs. Imperative",
+                    focus: "What to do vs. How to do it (Array Methods).",
+                    desc: "Imperative programming tells the computer exactly how to do something step-by-step. Declarative programming tells the computer what result you want, letting abstractions handle the mechanics.",
+                    analogyTitle: "The Auto Rickshaw Ride",
+                    analogyBad: "Bhaiya, go 100 meters straight, take a left from the Mother Dairy booth, avoid that pothole, take a right at the temple, and stop.",
+                    analogyGood: "Bhaiya, drop me at Rajiv Chowk Metro Station. The complex steps (driving and navigating) are abstracted away.",
+                    codeJunior: "const marks = [85, 92, 33, 78];\nlet passingMarks = [];\nfor (let i = 0; i < marks.length; i++) {\n  if (marks[i] >= 40) passingMarks.push(marks[i]);\n}",
+                    codeSenior: "const marks = [85, 92, 33, 78];\nconst passingMarks = marks.filter(mark => mark >= 40);",
+                    shiftReasons: [
+                        "Replaces manual loop indexing with robust higher-order functions.",
+                        "Chains methods to flow data directly into constants.",
+                        "Reads like English, reducing cognitive load for the reviewer."
+                    ],
+                    script: "I prefer a declarative abstraction here. By using filter, we achieve a cleaner separation of concerns and prioritize readability over micro-managing the iteration.",
+                    metrics: [75, 15]
+                },
+                {
+                    id: 3,
+                    title: "Pillar 3: The Interview Power Duo",
+                    focus: "Currying & Closures for modular logic.",
+                    desc: "Closures and Currying are top concepts in Big Tech interviews. A closure 'remembers' the variables from its creation environment. Currying evaluates a function with multiple arguments, one argument at a time.",
+                    analogyTitle: "The Delhi Metro Smart Card",
+                    analogyBad: "A regular function is like buying a single-use paper token.",
+                    analogyGood: "A Closure is a Metro Smart Card. It 'remembers' your balance. Currying configures it: createCard(student)(balance).",
+                    codeJunior: "const calculateDiscount = (discount, price) => price - (price * discount);\n\ncalculateDiscount(0.20, 1000);",
+                    codeSenior: "const applyDiscount = discount => price => price - (price * discount);\n\n// We 'lock in' the 20% discount in the closure's memory\nconst applyStudentDiscount = applyDiscount(0.20); \nconsole.log(applyStudentDiscount(1000)); // 800",
+                    shiftReasons: [
+                        "Breaks down massive functions into single-argument steps.",
+                        "Creates 'factory' closures to generate tailored functions.",
+                        "Prevents repetition of logic across the codebase."
+                    ],
+                    script: "I'm using lexical scoping to create a closure. Through partial application, we can lock in the first parameter and generate highly reusable utility functions without polluting the global scope.",
+                    metrics: [60, 30]
+                },
+                {
+                    id: 4,
+                    title: "Pillar 4: The Pipeline Method",
+                    focus: "Transforming spaghetti code into linear streams.",
+                    desc: "Spaghetti code happens when you nest functions inside functions. Functional programmers solve this with Composition: passing the output of one function directly into the input of the next.",
+                    analogyTitle: "Text Formatting Assembly Line",
+                    analogyBad: "One exhausted professor doing all evaluations at once.",
+                    analogyGood: "Data moves down a pipeline: Raw Input ➡️ Remove Spaces ➡️ Make Uppercase ➡️ Add Punctuation.",
+                    codeJunior: "const finalResult = exclaim(capitalize(trim(\"   namaste india   \")));\n// Hard to debug; you read it inside-out.",
+                    codeSenior: "const pipe = (...fns) => (x) => fns.reduce((v, f) => f(v), x);\n\nconst formatString = pipe(\n  trim,\n  capitalize,\n  exclaim\n);\n\nconst finalResult = formatString(\"   namaste india   \");",
+                    shiftReasons: [
+                        "Replaces inside-out nested functions (Onion Architecture).",
+                        "Reads top-to-bottom or left-to-right, making debugging easy.",
+                        "Encourages building small, single-purpose pure functions."
+                    ],
+                    script: "To respect the Single Responsibility Principle, I'm composing small, pure functions. This creates a highly readable unidirectional data flow.",
+                    metrics: [90, 25]
+                },
+                {
+                    id: 5,
+                    title: "Pillar 5: Deep Data Elegance",
+                    focus: "Handling nested structures without mutation.",
+                    desc: "In UI architectures like React, mutating deeply nested objects is a fatal flaw. You must learn to copy and update objects non-destructively using structural sharing.",
+                    analogyTitle: "B.Tech Final Project Versioning",
+                    analogyBad: "Permanently editing the only master copy of your thesis the night before.",
+                    analogyGood: "Duplicating the file to _v2, making the edit there, and preserving the original.",
+                    codeJunior: "const student = { name: \"Rahul\", academic: { branch: \"CSE\", sem: 3 } };\n\n// Destructive Mutation\nstudent.academic.sem = 4;",
+                    codeSenior: "const student = { name: \"Rahul\", academic: { branch: \"CSE\", sem: 3 } };\n\n// Deep Immutability via Spread Syntax\nconst updatedStudent = {\n  ...student,\n  academic: {\n    ...student.academic,\n    sem: 4\n  }\n};",
+                    shiftReasons: [
+                        "Prevents modifying the memory reference directly.",
+                        "Ensures UI frameworks can detect state changes reliably.",
+                        "Utilizes Structural Sharing to optimize memory."
+                    ],
+                    script: "I'm explicitly avoiding a destructive update. By using the spread operator to create a shallow copy at each nested level, we utilize structural sharing.",
+                    metrics: [50, 40]
+                },
+                {
+                    id: 6,
+                    title: "Pillar 6: The Screening Edge",
+                    focus: "Whiteboard strategy & signaling seniority.",
+                    desc: "Applying FP principles isn't just about clean code; it's about signaling to the interviewer that you operate at a higher architectural level than a typical junior engineer.",
+                    analogyTitle: "The Whiteboard Strategy",
+                    analogyBad: "Immediately writing a 'let' variable and a 'for' loop on the board.",
+                    analogyGood: "Pausing, stating state management goals, and writing declarative pipelines.",
+                    codeJunior: "// Typical Junior Start\nfunction process(data) {\n  let result = [];\n  // ...\n}",
+                    codeSenior: "// Senior Start\nconst processPipeline = (data) => {\n  // Using immutability and const exclusively\n  return data.map(...)\n};",
+                    shiftReasons: [
+                        "Never write a for loop unless specifically asked for pointer algorithms.",
+                        "Talk about state immutability proactively before writing code.",
+                        "Use const exclusively to force yourself out of accumulator habits."
+                    ],
+                    script: "Before I write the transformation, my priority here is to keep the state immutable and utilize a unidirectional data flow to prevent side effects.",
+                    metrics: [40, 10]
+                }
+            ]
+        };
+
+        let currentPillarId = 1;
+        let metricsChartInstance = null;
+
+        function init() {
+            renderNav();
+            renderContent(1);
+            setupToggleEvents();
+
+            // Key listener for escape key to hide Q&A
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') hideQnAScreen();
+            });
+        }
+
+        function showQnAScreen() {
+            document.getElementById('qna-overlay').style.display = 'flex';
+        }
+
+        function hideQnAScreen() {
+            document.getElementById('qna-overlay').style.display = 'none';
+        }
+
+        function renderNav() {
+            const navContainer = document.getElementById('nav-container');
+            masterclassData.pillars.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full text-left px-6 py-3 text-sm transition-colors focus:outline-none flex justify-between items-center group';
+                btn.id = 'nav-btn-' + p.id;
+                btn.innerHTML = `<span class="truncate pr-2">${p.title}</span>`;
+                btn.onclick = () => {
+                    currentPillarId = p.id;
+                    updateNavStyles();
+                    renderContent(p.id);
+                    setJuniorSeniorToggle('senior');
+                };
+                navContainer.appendChild(btn);
+            });
+            updateNavStyles();
+        }
+
+        function updateNavStyles() {
+            masterclassData.pillars.forEach(p => {
+                const btn = document.getElementById('nav-btn-' + p.id);
+                if (p.id === currentPillarId) {
+                    btn.className = 'w-full text-left px-6 py-3 text-sm transition-colors focus:outline-none flex justify-between items-center group active-nav';
+                } else {
+                    btn.className = 'w-full text-left px-6 py-3 text-sm transition-colors focus:outline-none flex justify-between items-center group inactive-nav';
+                }
+            });
+        }
+
+        function renderContent(id) {
+            const data = masterclassData.pillars.find(p => p.id === id);
+
+            document.getElementById('content-title').innerText = data.title;
+            document.getElementById('content-focus').innerText = data.focus;
+            document.getElementById('content-desc').innerText = data.desc;
+
+            document.getElementById('analogy-title').innerText = data.analogyTitle;
+            document.getElementById('analogy-bad').innerText = data.analogyBad;
+            document.getElementById('analogy-good').innerText = data.analogyGood;
+
+            document.getElementById('code-junior-view').innerText = data.codeJunior;
+            document.getElementById('code-senior-view').innerText = data.codeSenior;
+
+            document.getElementById('interview-script').innerText = '"' + data.script + '"';
+
+            const ul = document.getElementById('shift-reasons');
+            ul.innerHTML = '';
+            data.shiftReasons.forEach(r => {
+                const li = document.createElement('li');
+                li.innerText = r;
+                ul.appendChild(li);
+            });
+
+            updateMetricsChart(data.metrics);
+        }
+
+        function setupToggleEvents() {
+            const btnJr = document.getElementById('btn-junior');
+            const btnSr = document.getElementById('btn-senior');
+
+            btnJr.onclick = () => setJuniorSeniorToggle('junior');
+            btnSr.onclick = () => setJuniorSeniorToggle('senior');
+        }
+
+        function setJuniorSeniorToggle(mode) {
+            const btnJr = document.getElementById('btn-junior');
+            const btnSr = document.getElementById('btn-senior');
+            const viewJr = document.getElementById('code-junior-view');
+            const viewSr = document.getElementById('code-senior-view');
+
+            if (mode === 'junior') {
+                btnJr.className = 'px-4 py-1.5 rounded-md text-sm font-medium bg-white shadow-sm text-red-600 transition-all';
+                btnSr.className = 'px-4 py-1.5 rounded-md text-sm font-medium text-stone-500 hover:text-stone-700 transition-all';
+                viewJr.classList.remove('hide');
+                viewSr.classList.add('hide');
+            } else {
+                btnSr.className = 'px-4 py-1.5 rounded-md text-sm font-medium bg-white shadow-sm text-green-600 transition-all';
+                btnJr.className = 'px-4 py-1.5 rounded-md text-sm font-medium text-stone-500 hover:text-stone-700 transition-all';
+                viewSr.classList.remove('hide');
+                viewJr.classList.add('hide');
+            }
+        }
+
+        function updateMetricsChart(metrics) {
+            const ctx = document.getElementById('metricsChart').getContext('2d');
+
+            if (metricsChartInstance) {
+                metricsChartInstance.data.datasets[0].data = metrics;
+                metricsChartInstance.update();
+            } else {
+                metricsChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Junior Method', 'Senior Fix'],
+                        datasets: [{
+                            label: 'Cognitive Load / Fragility',
+                            data: metrics,
+                            backgroundColor: ['#f87171', '#4ade80'],
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: { beginAtZero: true, max: 100, display: false },
+                            x: { grid: { display: false } }
+                        },
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { enabled: false }
+                        }
+                    }
+                });
+            }
+        }
+
+        window.onload = init;
+    </script>
+</body>
+
+</html>
